@@ -5,14 +5,14 @@ compiled_package_info:
     bonding_curve: "0000000000000000000000000000000000000000000000000000000000000000"
     std: "0000000000000000000000000000000000000000000000000000000000000001"
     sui: "0000000000000000000000000000000000000000000000000000000000000002"
-  source_digest: 963859160A007A5BF2C167734D119141306076D9E10E2706921C956DFE7C87DE
+  source_digest: 1ADDFB08E6BF03592758625B44F647E2F3EA2546257070A98DE642724BA64BAB
   build_flags:
-    dev_mode: false
-    test_mode: false
+    dev_mode: true
+    test_mode: true
     generate_docs: false
     install_dir: ~
     force_recompilation: false
-    lock_file: "./Move.lock"
+    lock_file: ~
     fetch_deps_only: false
     skip_fetch_latest_git_deps: false
     default_flavor: sui

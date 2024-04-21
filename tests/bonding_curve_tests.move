@@ -34,7 +34,7 @@ module bonding_curve::bonding_curve_tests {
     use sui::test_scenario::{Self as ts, Scenario};
     use bonding_curve::meme::MEME;
     use sui::coin::{Self};
-    use bonding_curve::bonding_curve::{Self, Pool};
+    use bonding_curve::bonding_curve::{Self, Pool, Pooler};
     use sui::sui::SUI;
 
     const ENotImplemented: u64 = 0;
@@ -48,11 +48,11 @@ module bonding_curve::bonding_curve_tests {
         // Create the pool
         ts::next_tx(scenario, ADMIN);
         {
+            bonding_curve::init_for_testing(ts::ctx(scenario));
             // let meme_coin = ts::take_from_sender<Coin<MEME>>(scenario);
             let init_fund = coin::mint_for_testing<MEME>(1_000_000_000 * COIN_SCALER, ts::ctx(scenario));
             let init_sui = coin::mint_for_testing<SUI>(1 * COIN_SCALER, ts::ctx(scenario));
 
-            std::debug::print(&init_fund);
             bonding_curve::create_pool<MEME>(
                 init_fund,
                 init_sui,
@@ -83,18 +83,29 @@ module bonding_curve::bonding_curve_tests {
         ts::next_tx(scenario, bob);
         {
             let mut pool = ts::take_shared<Pool<MEME>>(scenario);
+            let mut pooler = ts::take_shared<Pooler>(scenario);
+
             let result_meme = bonding_curve::swap_sui<MEME>(
+                &mut pooler,
                 &mut pool,
                 coin::mint_for_testing<SUI>(25000 * COIN_SCALER, ts::ctx(scenario)),
                 ts::ctx(scenario),
             );
             let (sui_reserve, tok_reserve) = bonding_curve::get_amounts<MEME>(&pool);
 
-            std::debug::print(&result_meme);
-            transfer::public_transfer(result_meme, bob);
-            std::debug::print(&sui_reserve);
-            std::debug::print(&tok_reserve);
+            let result_sui = bonding_curve::swap_token<MEME>(
+                &mut pooler,
+                &mut pool,
+                result_meme,
+                ts::ctx(scenario),
+            );
+
+            // std::debug::print(&result_meme);
+            transfer::public_transfer(result_sui, bob);
+            // std::debug::print(&sui_reserve);
+            // std::debug::print(&tok_reserve);
             ts::return_shared(pool);
+            ts::return_shared(pooler);
         };
         ts::end(scenario_val);
 

@@ -21,6 +21,13 @@ module bonding_curve::bonding_curve {
     /// Trading disabled
     const ETradingDisabled: u64 = 3;
 
+    /// The integer scaling setting for fees calculation.
+    const FEE_SCALING: u128 = 100;
+
+    const DEFAULT_FEE: u128 = 100;
+
+    const DEFAULT_FEE_PERCENTAGE: u128 = 99;
+
     /// The max value that can be held in one of the Balances of
     /// a Pool. U64 MAX
     const MAX_POOL_VALUE: u64 = {
@@ -28,6 +35,13 @@ module bonding_curve::bonding_curve {
     };
 
     const BASE_SUI_AMOUNT: u64 = 4200 * 1_000_000_000;
+
+    /// The pool of this contract to store all fees
+    /// The fee is always taken in SUI
+    public struct Pooler has key {
+        id: UID,
+        sui: Balance<SUI>
+    }
 
     /// The pool with exchange.
     public struct Pool<phantom T> has key {
@@ -47,6 +61,20 @@ module bonding_curve::bonding_curve {
         let admin = tx_context::sender(ctx);
         let admin_cap = AdminCap { id: object::new(ctx) };
         transfer::transfer(admin_cap, admin);
+        let pool = Pooler {
+            id: object::new(ctx),
+            sui: balance::zero()
+        };
+        transfer::share_object(pool);
+    }
+
+    public fun withdraw_fees(
+        admin_cap: &AdminCap, 
+        pooler: &mut Pooler, 
+        ctx: &mut TxContext
+    ): Coin<SUI> {
+        let sui_amt = balance::value(&pooler.sui);
+        coin::take(&mut pooler.sui, sui_amt, ctx)
     }
 
     public fun set_trading_enabled<T>(
@@ -82,7 +110,10 @@ module bonding_curve::bonding_curve {
     }
 
     public fun swap_token<T>(
-        pool: &mut Pool<T>, token: Coin<T>, ctx: &mut TxContext
+        pooler: &mut Pooler,
+        pool: &mut Pool<T>, 
+        token: Coin<T>, 
+        ctx: &mut TxContext
     ): Coin<SUI> {
         assert!(coin::value(&token) > 0, EZeroAmount);
         assert!(pool.trading_enabled, ETradingDisabled);
@@ -99,31 +130,48 @@ module bonding_curve::bonding_curve {
         );
 
         balance::join(&mut pool.token, tok_balance);
-        coin::take(&mut pool.sui, output_amount, ctx)
+        let mut sui_result_balance = balance::split(&mut pool.sui, output_amount);
+        let sui_amt = balance::value(&sui_result_balance);
+        let after_fee_sui = (((sui_amt as u128) * 99 / 100) as u64);
+        let return_coin = coin::take(&mut sui_result_balance, after_fee_sui, ctx);
+        balance::join(&mut pooler.sui, sui_result_balance);
+        return_coin
     }
 
     /// Swap `Coin<SUI>` for the `Coin<T>`.
     /// Returns Coin<T>.
     public fun swap_sui<T>(
-        pool: &mut Pool<T>, sui: Coin<SUI>, ctx: &mut TxContext
+        pooler: &mut Pooler,
+        pool: &mut Pool<T>, 
+        sui: Coin<SUI>, 
+        ctx: &mut TxContext
     ): Coin<T> {
         assert!(coin::value(&sui) > 0, EZeroAmount);
         assert!(pool.trading_enabled, ETradingDisabled);
 
-        let sui_balance = coin::into_balance(sui);
-
+        let mut sui_balance = coin::into_balance(sui);
+        let sui_amt = balance::value(&sui_balance);
         // Calculate the output amount
         let (sui_reserve, token_reserve) = get_amounts(pool);
+        std::debug::print(&sui_reserve);
+        std::debug::print(&token_reserve);
+
+        // Take the fee on sui
+        let after_fee_sui = (((sui_amt as u128) * 99 / 100) as u64);
+        let after_fee_balance = balance::split(&mut sui_balance, after_fee_sui);
+        std::debug::print(&after_fee_sui);
 
         assert!(sui_reserve > 0 && token_reserve > 0, EReservesEmpty);
 
         let output_amount = get_input_price(
-            balance::value(&sui_balance),
+            balance::value(&after_fee_balance),
             sui_reserve + BASE_SUI_AMOUNT,
             token_reserve
         );
 
-        balance::join(&mut pool.sui, sui_balance);
+        balance::join(&mut pool.sui, after_fee_balance);
+        // The rest of the fees
+        balance::join(&mut pooler.sui, sui_balance);
         coin::take(&mut pool.token, output_amount, ctx)
     }
 
@@ -208,6 +256,9 @@ module bonding_curve::bonding_curve {
         )
     }
 
-
+    #[test_only]
+    public fun init_for_testing(ctx: &mut TxContext) {
+        init(ctx)
+    }
 }
 
