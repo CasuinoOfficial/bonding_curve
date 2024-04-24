@@ -49,16 +49,20 @@ module bonding_curve::bonding_curve_tests {
         ts::next_tx(scenario, ADMIN);
         {
             bonding_curve::init_for_testing(ts::ctx(scenario));
-            // let meme_coin = ts::take_from_sender<Coin<MEME>>(scenario);
+        };
+        ts::next_tx(scenario, ADMIN);
+        {
+            let mut pooler = ts::take_shared<Pooler>(scenario);
             let init_fund = coin::mint_for_testing<MEME>(1_000_000_000 * COIN_SCALER, ts::ctx(scenario));
-            let init_sui = coin::mint_for_testing<SUI>(1 * COIN_SCALER, ts::ctx(scenario));
+            let init_sui = coin::mint_for_testing<SUI>(1 * COIN_SCALER + 1, ts::ctx(scenario));
 
-            bonding_curve::create_pool<MEME>(
+            bonding_curve::create_pool_for_testing<MEME>(
+                &mut pooler,
                 init_fund,
                 init_sui,
                 ts::ctx(scenario)
             );
-
+            ts::return_shared(pooler);
         };
         
         scenario_val
