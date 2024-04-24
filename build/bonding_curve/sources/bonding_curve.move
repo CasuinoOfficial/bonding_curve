@@ -41,6 +41,7 @@ module bonding_curve::bonding_curve {
     const BASE_SUI_AMOUNT: u64 = 4200 * 1_000_000_000;
     const DEFAULT_CREATION_FEE: u64 = 1 * 1_000_000_000;
     const DEFAULT_SUPPLY: u64 = 1_000_000_000 * 1_000_000_000;
+    const DEFAULT_TARGET_SUPPLY_LEFT: u64 = 150_000_000 * 1_000_000_000;
 
     /// The pool of this contract to store all fees
     /// The fee is always taken in SUI
@@ -270,6 +271,17 @@ module bonding_curve::bonding_curve {
             sui_amt,
             output_amount
         );
+
+        // Pause trading when target gets hit
+        let (sui_amount, tok_amount) = get_amounts(pool);
+        if (tok_amount <= DEFAULT_TARGET_SUPPLY_LEFT) {
+            pool.trading_enabled = false;
+            events::emit_token_migration_target_hit_event<T>(
+                object::id(pool), 
+                sui_amount,
+                output_amount
+            );
+        };
 
         coin::take(&mut pool.token, output_amount, ctx)
     }

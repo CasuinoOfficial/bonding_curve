@@ -63,4 +63,19 @@ module bonding_curve::events {
     ) {
         event::emit(SwapSuiEvent<T> { pool_id, user, sui_amount, token_amount });
     }
+
+    // Migration Target Reached Event
+    public struct MigrationTargetEvent<phantom T> has copy, drop {
+        pool_id: ID,
+        sui_amount: u64,
+        token_amount: u64
+    }
+
+    public(package) fun emit_token_migration_target_hit_event<T>(
+        pool_id: ID,
+        sui_amount: u64,
+        token_amount: u64
+    ) {
+        event::emit(MigrationTargetEvent<T> { pool_id, sui_amount, token_amount });
+    }
 }
